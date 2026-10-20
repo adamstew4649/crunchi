@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self';">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crunchi</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">CRUNCH<span>I</span></div>
+      <div class="tagline">MUSIC, BUT CRUNCHY.</div>
+    </div>
+    <div class="header-actions">
+      <span class="privacy-badge">NO UPLOADS</span>
+      <button id="openBtn" class="open-btn" type="button">
+        <span>OPEN TRACK</span>
+        <kbd>⌘O</kbd>
+      </button>
+    </div>
+  </header>
+
+  <main class="app">
+    <aside class="controls panel">
+      <div class="panel-head">
+        <span class="step">01</span>
+        <h2>THE CRUNCHER</h2>
+        <div class="meter" title="Crunch factor">
+          <div class="meter-bars" id="meterBars" aria-hidden="true"></div>
+          <span class="meter-label" id="meterLabel">CRUNCHY</span>
+        </div>
+      </div>
+
+      <div class="presets" id="presets" role="group" aria-label="Crunch presets">
+        <button type="button" data-preset="toast">TOAST</button>
+        <button type="button" data-preset="crunchy" class="active">CRUNCHY</button>
+        <button type="button" data-preset="fried">DEEP FRIED</button>
+        <button type="button" data-preset="demolished">DEMOLISHED</button>
+      </div>
+
+      <div class="sliders">
+        <div class="control">
+          <div class="control-top">
+            <label for="bits">BIT DEPTH</label>
+            <output id="bitsOut" for="bits">6 bit</output>
+          </div>
+          <input id="bits" type="range" min="2" max="12" step="1" value="6" data-setting="bits">
+        </div>
+
+        <div class="control">
+          <div class="control-top">
+            <label for="rate">SAMPLE RATE</label>
+            <output id="rateOut" for="rate">11.0 kHz</output>
+          </div>
+          <input id="rate" type="range" min="1000" max="22050" step="50" value="11025" data-setting="rate">
+        </div>
+
+        <div class="control">
+          <div class="control-top">
+            <label for="kbps">CODEC BITRATE</label>
+            <output id="kbpsOut" for="kbps">24 kbps</output>
+          </div>
+          <input id="kbps" type="range" min="8" max="128" step="1" value="24" data-setting="kbps">
+        </div>
+
+        <div class="control">
+          <div class="control-top">
+            <label for="drive">DRIVE</label>
+            <output id="driveOut" for="drive">+10 dB</output>
+          </div>
+          <input id="drive" type="range" min="0" max="24" step="1" value="10" data-setting="drive">
+        </div>
+
+        <div class="control">
+          <div class="control-top">
+            <label for="tone">TONE</label>
+            <output id="toneOut" for="tone">14.0 kHz</output>
+          </div>
+          <input id="tone" type="range" min="2000" max="20000" step="250" value="14000" data-setting="tone">
+        </div>
+      </div>
+
+      <div class="options">
+        <label class="switch-row" for="mono">
+          <span>FORCE MONO</span>
+          <input id="mono" type="checkbox">
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+
+        <label class="select-row" for="passes">
+          <span>PASSES</span>
+          <select id="passes">
+            <option value="1">1×</option>
+            <option value="2">2×</option>
+            <option value="3">3×</option>
+          </select>
+        </label>
+
+        <label class="select-row" for="engine">
+          <span>CODEC</span>
+          <select id="engine">
+            <option value="mp3">MP3</option>
+            <option value="opus">OPUS</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="auto-row">
+        <label class="check-row" for="autoPreview">
+          <input id="autoPreview" type="checkbox" checked>
+          <span class="checkbox" aria-hidden="true"></span>
+          <span>AUTO-PREVIEW</span>
+        </label>
+        <span class="auto-hint">re-crunches the full song</span>
+      </div>
+
+      <button id="crunchBtn" class="crunch-btn" type="button" disabled>
+        <span id="crunchBtnLabel">CRUNCH IT</span>
+        <span class="key-hint">FULL SONG · LIVE PREVIEW</span>
+      </button>
+
+      <div class="progress" id="progress" hidden>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-meta">
+          <span id="progressStage">CRUNCHING</span>
+          <span id="progressPct">0%</span>
+        </div>
+      </div>
+
+      <div class="signal-chain" aria-hidden="true">
+        <span class="chain-label">SIGNAL CHAIN</span>
+        <div class="chain-flow">
+          <span>DRIVE</span>
+          <i>›</i>
+          <span>BITS</span>
+          <i>›</i>
+          <span>RATE</span>
+          <i>›</i>
+          <span>CODEC</span>
+          <i>›</i>
+          <span>LIMIT</span>
+        </div>
+      </div>
+    </aside>
+
+    <div class="audio-column">
+      <section class="source-panel panel" id="dropZone">
+        <div class="panel-head compact">
+          <span class="step">02</span>
+          <h2>YOUR TRACK</h2>
+          <span class="file-meta" id="sourceMeta">NO FILE LOADED</span>
+        </div>
+
+        <div class="wave-wrap source-wave" id="sourceWaveWrap">
+          <canvas id="sourceCanvas"></canvas>
+          <div class="wave-empty" id="sourceEmpty">
+            <div class="drop-mark" aria-hidden="true">↓</div>
+            <p><strong>DROP A TRACK</strong><br><span>or click to browse · WAV, MP3, FLAC, M4A, OGG</span></p>
+          </div>
+          <div class="playhead" id="sourcePlayhead"></div>
+        </div>
+
+        <div class="source-bottom">
+          <span class="file-name" id="fileName">Nothing loaded yet</span>
+          <span class="file-info" id="fileInfo">—</span>
+          <button class="mini-btn" id="replaceBtn" type="button" hidden>REPLACE</button>
+        </div>
+      </section>
+
+      <section class="result-panel panel">
+        <div class="panel-head compact">
+          <span class="step">03</span>
+          <h2>THE RESULT</h2>
+          <span class="state-badge" id="resultState" aria-live="polite">WAITING</span>
+        </div>
+
+        <div class="wave-wrap result-wave" id="resultWaveWrap">
+          <canvas id="resultCanvas"></canvas>
+          <div class="wave-empty" id="resultEmpty">
+            <div class="drop-mark" aria-hidden="true">↯</div>
+            <p>Your crunchy track lands here.<br><span>Full song. Every setting. No limits.</span></p>
+          </div>
+          <div class="playhead" id="resultPlayhead"></div>
+        </div>
+
+        <div class="transport">
+          <button id="playBtn" class="play-btn" type="button" aria-label="Play" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path id="playIcon" d="M8 5v14l11-7z"/></svg>
+          </button>
+          <div class="ab-switch" role="group" aria-label="Compare original and crunched">
+            <button type="button" data-audio="source">ORIGINAL</button>
+            <button type="button" data-audio="result" class="active">CRUNCHED</button>
+          </div>
+          <span class="time-readout" id="timeReadout">0:00 / 0:00</span>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <span class="stat-label">CODEC</span>
+            <span class="stat-value" id="statCodec">—</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">BIT DEPTH</span>
+            <span class="stat-value" id="statBits">—</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">SAMPLE RATE</span>
+            <span class="stat-value" id="statRate">—</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">FILE SIZE</span>
+            <span class="stat-value" id="statSize">—</span>
+          </div>
+        </div>
+
+        <div class="downloads">
+          <button id="downloadCodec" class="btn-primary" type="button" disabled>
+            <span id="downloadCodecLabel">DOWNLOAD MP3</span>
+            <span class="btn-size" id="codecSize"></span>
+          </button>
+          <button id="downloadWav" class="btn-ghost" type="button" disabled>WAV</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <span class="footer-brand">CRUNCHI <span id="versionLabel">v1.0</span></span>
+    <span class="footer-sep"></span>
+    <span>EVERYTHING STAYS ON YOUR MACHINE</span>
+    <span class="footer-spacer"></span>
+    <span class="ffmpeg-status" id="ffmpegStatus">OPUS: CHECKING…</span>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="vendor/lame.all.js"></script>
+  <script src="js/wav.js"></script>
+  <script src="js/dsp.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
