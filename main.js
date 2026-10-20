@@ -6,7 +6,7 @@ const { execFile } = require('node:child_process');
 
 const AUDIO_EXTENSIONS = [
   'wav', 'mp3', 'flac', 'm4a', 'aac', 'ogg', 'oga', 'opus',
-  'aif', 'aiff', 'caf', 'webm', 'mp4'
+  '3gp', '3g2', 'aif', 'aiff', 'caf', 'webm', 'mp4'
 ];
 
 let mainWindow = null;
@@ -230,7 +230,8 @@ ipcMain.handle('dialog:save-file', async (_event, payload) => {
   const filters = {
     wav: [{ name: 'WAV audio', extensions: ['wav'] }],
     mp3: [{ name: 'MP3 audio', extensions: ['mp3'] }],
-    opus: [{ name: 'Opus audio', extensions: ['opus'] }]
+    opus: [{ name: 'Opus audio', extensions: ['opus'] }],
+    '3gp': [{ name: '3GP audio', extensions: ['3gp'] }]
   }[extension] || [{ name: 'Audio', extensions: [extension] }];
 
   const result = await dialog.showSaveDialog(mainWindow, {
@@ -245,7 +246,7 @@ ipcMain.handle('dialog:save-file', async (_event, payload) => {
   return { saved: true, path: result.filePath };
 });
 
-ipcMain.handle('codec:opus', async (_event, payload) => {
+async function encodeWithFfmpeg(payload, codec) {
   const ffmpeg = await findFfmpeg();
   if (!ffmpeg) throw new Error('ffmpeg was not found on this machine.');
 
@@ -253,38 +254,57 @@ ipcMain.handle('codec:opus', async (_event, payload) => {
 
   const sampleRate = Math.round(Number(payload.sampleRate) || 44100);
   const channels = Number(payload.channels) === 1 ? 1 : 2;
-  const kbps = Math.max(6, Math.min(128, Math.round(Number(payload.kbps) || 12)));
   const pcm = payload.pcm;
 
   if (pcm.length % channels !== 0) {
     throw new Error('The audio data is not aligned to the channel count.');
   }
 
+  const isThreeGp = codec === '3gp';
+  const extension = isThreeGp ? '3gp' : 'opus';
+  const kbps = isThreeGp
+    ? Math.max(8, Math.min(32, Math.round(Number(payload.kbps) || 24)))
+    : Math.max(6, Math.min(128, Math.round(Number(payload.kbps) || 12)));
+
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'crunchi-'));
   const inputPath = path.join(tempDir, 'input.wav');
-  const opusPath = path.join(tempDir, 'output.opus');
+  const outputPath = path.join(tempDir, `output.${extension}`);
 
   try {
     await fs.writeFile(inputPath, wavFromPcm16(pcm, sampleRate, channels));
 
-    await execFileBuffer(ffmpeg, [
-      '-hide_banner', '-loglevel', 'error', '-y',
-      '-i', inputPath,
-      '-vn', '-map_metadata', '-1',
-      '-c:a', 'libopus',
-      '-b:a', `${kbps}k`,
-      '-vbr', 'off',
-      '-frame_duration', '60',
-      '-ac', String(channels),
-      '-f', 'opus',
-      opusPath
-    ]);
+    const encodeArgs = isThreeGp
+      ? [
+          '-hide_banner', '-loglevel', 'error', '-y',
+          '-i', inputPath,
+          '-vn', '-map_metadata', '-1',
+          '-c:a', 'aac',
+          '-b:a', `${kbps}k`,
+          '-ar', '8000',
+          '-ac', '1',
+          '-f', '3gp',
+          outputPath
+        ]
+      : [
+          '-hide_banner', '-loglevel', 'error', '-y',
+          '-i', inputPath,
+          '-vn', '-map_metadata', '-1',
+          '-c:a', 'libopus',
+          '-b:a', `${kbps}k`,
+          '-vbr', 'off',
+          '-frame_duration', '60',
+          '-ac', String(channels),
+          '-f', 'opus',
+          outputPath
+        ];
 
-    const opus = await fs.readFile(opusPath);
+    await execFileBuffer(ffmpeg, encodeArgs);
+
+    const encoded = await fs.readFile(outputPath);
 
     const { stdout } = await execFileBuffer(ffmpeg, [
       '-hide_banner', '-loglevel', 'error',
-      '-i', opusPath,
+      '-i', outputPath,
       '-f', 's16le',
       '-acodec', 'pcm_s16le',
       '-ar', String(sampleRate),
@@ -299,10 +319,12 @@ ipcMain.handle('codec:opus', async (_event, payload) => {
     }
 
     return {
-      opus: new Uint8Array(opus),
+      bytes: new Uint8Array(encoded),
       pcm: pcmOut,
       sampleRate,
-      channels
+      channels,
+      kbps,
+      codec: isThreeGp ? '3gp' : 'opus'
     };
   } catch (error) {
     const detail = error.stderrText ? ` ${error.stderrText.split('\n').slice(-2).join(' ')}` : '';
@@ -310,7 +332,10 @@ ipcMain.handle('codec:opus', async (_event, payload) => {
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
-});
+}
+
+ipcMain.handle('codec:opus', (_event, payload) => encodeWithFfmpeg(payload, 'opus'));
+ipcMain.handle('codec:3gp', (_event, payload) => encodeWithFfmpeg(payload, '3gp'));
 
 /* ------------------------------------------------------------------ */
 /* lifecycle                                                           */

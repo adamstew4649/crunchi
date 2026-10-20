@@ -1,7 +1,7 @@
 {
   "name": "crunchi",
   "productName": "Crunchi",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A desktop app that compresses music into gloriously crunchy artifacts.",
   "main": "main.js",
   "author": "Adam",

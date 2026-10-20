@@ -63,6 +63,7 @@
 
   function sanitize(settings = {}) {
     const merged = { ...DEFAULT_SETTINGS, ...settings };
+    const engine = merged.engine === 'opus' || merged.engine === '3gp' ? merged.engine : 'mp3';
     return {
       bits: Math.round(clamp(Number(merged.bits) || 6, 2, 16)),
       rate: Math.round(clamp(Number(merged.rate) || 11025, 500, 44100)),
@@ -71,7 +72,7 @@
       tone: Math.round(clamp(Number(merged.tone) || 14000, 500, 20000)),
       passes: Math.round(clamp(Number(merged.passes) || 1, 1, 4)),
       mono: Boolean(merged.mono),
-      engine: merged.engine === 'opus' ? 'opus' : 'mp3'
+      engine
     };
   }
 
@@ -332,7 +333,8 @@
     const kbps = clamp(1 - (s.kbps - 8) / (128 - 8), 0, 1);
     const drive = clamp(s.drive / 24, 0, 1);
     const passes = clamp((s.passes - 1) / 2, 0, 1);
-    const score = bits * 0.32 + rate * 0.26 + kbps * 0.26 + drive * 0.1 + passes * 0.06;
+    const codec = s.engine === '3gp' ? 0.1 : 0;
+    const score = bits * 0.32 + rate * 0.26 + kbps * 0.26 + drive * 0.1 + passes * 0.06 + codec;
     return Math.round(clamp(score, 0.02, 1) * 100);
   }
 
@@ -353,6 +355,7 @@
    * @param {(value:number,label:string)=>void} options.onProgress
    * @param {AbortSignal} options.signal
    * @param {(channels:Float32Array[],sampleRate:number,kbps:number)=>Promise<{bytes:Uint8Array,channels:Float32Array[]}>} options.opusEncode
+   * @param {(channels:Float32Array[],sampleRate:number,kbps:number)=>Promise<{bytes:Uint8Array,channels:Float32Array[]}>} options.threeGpEncode
    */
   async function process(buffer, settings, options = {}) {
     const opts = sanitize(settings);
@@ -394,6 +397,9 @@
     if (engine === 'opus' && typeof options.opusEncode !== 'function') {
       engine = 'mp3';
     }
+    if (engine === '3gp' && typeof options.threeGpEncode !== 'function') {
+      engine = 'mp3';
+    }
 
     let codecBytes = null;
     const passes = opts.passes;
@@ -402,11 +408,12 @@
       checkAbort();
       const base = 0.16 + (pass / passes) * 0.8;
       const span = 0.8 / passes;
-      const engineLabel = engine === 'opus' ? 'OPUS' : 'MP3';
+      const engineLabel = engine === 'opus' ? 'OPUS' : engine === '3gp' ? '3GP' : 'MP3';
       report(base, `${engineLabel} PASS ${pass + 1}/${passes}`);
 
-      if (engine === 'opus') {
-        const encoded = await options.opusEncode(channels, sampleRate, opts.kbps);
+      if (engine === 'opus' || engine === '3gp') {
+        const encode = engine === 'opus' ? options.opusEncode : options.threeGpEncode;
+        const encoded = await encode(channels, sampleRate, opts.kbps);
         checkAbort();
         codecBytes = encoded.bytes;
         channels = fitChannels(encoded.channels, frames, channelCount);
@@ -438,7 +445,7 @@
       channels,
       sampleRate,
       codecBytes,
-      codecExt: engine === 'opus' ? 'opus' : 'mp3',
+      codecExt: engine === 'opus' ? 'opus' : engine === '3gp' ? '3gp' : 'mp3',
       settings: { ...opts, engine }
     };
   }

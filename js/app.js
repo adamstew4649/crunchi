@@ -71,6 +71,7 @@
   const abSource = document.querySelector('.ab-switch button[data-audio="source"]');
   const abResult = document.querySelector('.ab-switch button[data-audio="result"]');
   const opusOption = document.querySelector('#engine option[value="opus"]');
+  const threeGpOption = document.querySelector('#engine option[value="3gp"]');
 
   const PLAY_PATH = 'M8 5v14l11-7z';
   const PAUSE_PATH = 'M6 5h4v14H6zM14 5h4v14h-4z';
@@ -532,23 +533,33 @@
     ui.el.style.setProperty('--p', `${clamp(percent, 0, 100)}%`);
   }
 
+  function syncBitrateRange() {
+    const max = state.settings.engine === '3gp' ? 32 : 128;
+    els.kbps.min = '8';
+    els.kbps.max = String(max);
+    state.settings.kbps = clamp(state.settings.kbps, 8, max);
+  }
+
   function syncSettingsUI() {
+    syncBitrateRange();
     Object.keys(CONTROL_UI).forEach(updateControlUI);
     els.mono.checked = Boolean(state.settings.mono);
     els.passes.value = String(state.settings.passes);
     els.engine.value = state.settings.engine;
   }
 
-  function soundKey(settings) {
-    const value = DSP.sanitize(settings);
-    return [value.bits, value.rate, value.kbps, value.drive, value.tone, value.passes, value.mono ? 1 : 0].join('|');
+  function soundKey(settings, engine = state.settings.engine) {
+    const value = DSP.sanitize({ ...settings, engine });
+    const kbpsMax = engine === '3gp' ? 32 : 128;
+    const kbps = clamp(value.kbps, 8, kbpsMax);
+    return [value.bits, value.rate, kbps, value.drive, value.tone, value.passes, value.mono ? 1 : 0].join('|');
   }
 
   function updatePresetButtons() {
     const current = soundKey(state.settings);
     els.presets.querySelectorAll('button[data-preset]').forEach((button) => {
       const preset = PRESETS[button.dataset.preset];
-      button.classList.toggle('active', Boolean(preset) && soundKey(preset.settings) === current);
+      button.classList.toggle('active', Boolean(preset) && soundKey(preset.settings, state.settings.engine) === current);
     });
   }
 
@@ -726,7 +737,22 @@
     });
 
     return {
-      bytes: new Uint8Array(response.opus),
+      bytes: new Uint8Array(response.bytes),
+      channels: DSP.deinterleaveInt16(response.pcm, channels.length, channels[0].length)
+    };
+  }
+
+  async function threeGpEncode(channels, sampleRate, kbps) {
+    const pcm = DSP.interleaveInt16(channels);
+    const response = await window.crunchi.threeGpPass({
+      pcm,
+      sampleRate,
+      channels: channels.length,
+      kbps
+    });
+
+    return {
+      bytes: new Uint8Array(response.bytes),
       channels: DSP.deinterleaveInt16(response.pcm, channels.length, channels[0].length)
     };
   }
@@ -757,7 +783,8 @@
         onProgress: (value, label) => {
           if (token === state.renderToken) updateProgress(value, label);
         },
-        opusEncode: state.ffmpeg ? opusEncode : null
+        opusEncode: state.ffmpeg ? opusEncode : null,
+        threeGpEncode: state.ffmpeg ? threeGpEncode : null
       });
 
       if (token !== state.renderToken || state.sourceBuffer !== source) return;
@@ -1063,13 +1090,16 @@
     });
 
     els.engine.addEventListener('change', () => {
-      if (els.engine.value === 'opus' && !state.ffmpeg) {
+      const engine = els.engine.value;
+      if ((engine === 'opus' || engine === '3gp') && !state.ffmpeg) {
         els.engine.value = 'mp3';
         state.settings.engine = 'mp3';
-        toast('Opus needs ffmpeg. Install it, then restart Crunchi.');
+        syncSettingsUI();
+        toast(`${engine === '3gp' ? '3GP' : 'Opus'} needs ffmpeg. Install it, then restart Crunchi.`);
         return;
       }
-      state.settings.engine = els.engine.value;
+      state.settings.engine = engine;
+      syncSettingsUI();
       onSettingsChanged(true);
     });
 
@@ -1137,16 +1167,18 @@
     if (info.version) els.versionLabel.textContent = `v${info.version}`;
 
     if (state.ffmpeg) {
-      els.ffmpegStatus.textContent = 'OPUS: READY';
+      els.ffmpegStatus.textContent = 'FFMPEG: READY';
       els.ffmpegStatus.className = 'ffmpeg-status ready';
-      els.ffmpegStatus.title = info.ffmpegPath || 'ffmpeg found';
+      els.ffmpegStatus.title = `${info.ffmpegPath || 'ffmpeg'} — Opus and 3GP enabled`;
       if (opusOption) opusOption.disabled = false;
+      if (threeGpOption) threeGpOption.disabled = false;
     } else {
-      els.ffmpegStatus.textContent = 'OPUS: NEEDS FFMPEG';
+      els.ffmpegStatus.textContent = 'FFMPEG: MISSING';
       els.ffmpegStatus.className = 'ffmpeg-status missing';
-      els.ffmpegStatus.title = 'Install ffmpeg to unlock Opus, then restart Crunchi.';
+      els.ffmpegStatus.title = 'Install ffmpeg to unlock Opus and 3GP, then restart Crunchi.';
       if (opusOption) opusOption.disabled = true;
-      if (state.settings.engine === 'opus') {
+      if (threeGpOption) threeGpOption.disabled = true;
+      if (state.settings.engine === 'opus' || state.settings.engine === '3gp') {
         state.settings.engine = 'mp3';
         syncSettingsUI();
       }
@@ -1165,9 +1197,10 @@
     try {
       applyAppInfo(await window.crunchi.appInfo());
     } catch (error) {
-      els.ffmpegStatus.textContent = 'OPUS: UNAVAILABLE';
+      els.ffmpegStatus.textContent = 'FFMPEG: UNAVAILABLE';
       els.ffmpegStatus.className = 'ffmpeg-status missing';
       if (opusOption) opusOption.disabled = true;
+      if (threeGpOption) threeGpOption.disabled = true;
     }
   }
 

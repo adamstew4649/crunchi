@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('crunchi', {
   openAudio: () => ipcRenderer.invoke('dialog:open-audio'),
   saveFile: (payload) => ipcRenderer.invoke('dialog:save-file', payload),
   opusPass: (payload) => ipcRenderer.invoke('codec:opus', payload),
+  threeGpPass: (payload) => ipcRenderer.invoke('codec:3gp', payload),
   onMenuOpen: (callback) => {
     const handler = () => callback();
     ipcRenderer.on('menu:open', handler);
