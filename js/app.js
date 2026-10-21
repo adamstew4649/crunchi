@@ -10,6 +10,7 @@
 
   const els = {
     openBtn: $('openBtn'),
+    openKeyHint: $('openKeyHint'),
     replaceBtn: $('replaceBtn'),
     sourceMeta: $('sourceMeta'),
     sourceWaveWrap: $('sourceWaveWrap'),
@@ -1165,6 +1166,9 @@
 
     state.ffmpeg = Boolean(info.ffmpeg);
     if (info.version) els.versionLabel.textContent = `v${info.version}`;
+    if (els.openKeyHint && info.platform) {
+      els.openKeyHint.textContent = info.platform === 'darwin' ? '⌘O' : 'Ctrl+O';
+    }
 
     if (state.ffmpeg) {
       els.ffmpegStatus.textContent = 'FFMPEG: READY';

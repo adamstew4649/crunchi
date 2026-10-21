@@ -18,8 +18,8 @@ Crunchi is a desktop app that takes a track and re-encodes it through a delibera
 ## Requirements
 
 - Node.js 20+ and npm (for development).
-- macOS (tested). Electron also runs on Windows and Linux.
-- Optional: [ffmpeg](https://ffmpeg.org/) for the Opus and 3GP engines. `brew install ffmpeg` on macOS. Crunchi detects it automatically and shows `FFMPEG: READY` in the footer. Opus uses ffmpeg's `libopus` encoder, so `opus-tools` is not required. 3GP uses AAC at 8 kHz mono.
+- macOS, Windows, or Linux. Linux packages are built as AppImage, `.deb`, and `.tar.gz`.
+- Optional: [ffmpeg](https://ffmpeg.org/) for the Opus and 3GP engines. `brew install ffmpeg` on macOS, `sudo pacman -S ffmpeg` on Arch, or `sudo apt install ffmpeg` on Debian/Ubuntu. Crunchi detects it automatically and shows `FFMPEG: READY` in the footer. Opus uses ffmpeg's `libopus` encoder, so `opus-tools` is not required. 3GP uses AAC at 8 kHz mono.
 
 MP3 works without ffmpeg because lamejs is vendored in `vendor/`.
 
@@ -84,11 +84,41 @@ Files are saved as `<track name> (crunchy).<ext>`.
 ## Build a desktop app
 
 ```sh
-npm run pack   # unpacked .app in dist/
-npm run dist   # DMG + zip
+npm run pack   # unpacked app directory in dist/
+npm run dist   # packages for the current platform
 ```
 
-The macOS bundle is unsigned by default. For distribution, sign and notarize it with your Apple credentials.
+macOS builds produce a DMG and zip. The macOS bundle is unsigned by default. For distribution, sign and notarize it with your Apple credentials.
+
+### Linux
+
+On Arch, install the build and runtime prerequisites:
+
+```sh
+sudo pacman -S --needed base-devel nodejs npm git fakeroot
+sudo pacman -S --needed gtk3 nss libxss libxtst libcups alsa-lib \
+  at-spi2-core libdrm mesa libxkbcommon libxcomposite libxdamage \
+  libxrandr
+```
+
+Most of the Electron runtime libraries are already present on a normal desktop Arch install, and `mesa` supplies `libgbm`. You do not need `dpkg`: electron-builder bundles its own `.deb` packaging tool. Install `dpkg` only if you want to inspect the result with `dpkg-deb`.
+
+Then build all Linux packages:
+
+```sh
+npm install
+npm run dist:linux
+```
+
+This writes three artifacts to `dist/`:
+
+- `Crunchi-<version>-x86_64.AppImage` — portable single file
+- `Crunchi-<version>-amd64.deb` — Debian/Ubuntu package
+- `Crunchi-<version>-x64.tar.gz` — plain unpacked bundle
+
+To run the AppImage on Arch, install FUSE 2 (`sudo pacman -S --needed fuse2`) or use `./Crunchi-*.AppImage --appimage-extract-and-run`.
+
+The [Linux release workflow](.github/workflows/release-linux.yml) builds these packages on Ubuntu and attaches them to the matching `v*` GitHub release. It can also be run manually from the Actions tab.
 
 ## Project layout
 

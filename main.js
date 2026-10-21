@@ -14,6 +14,7 @@ let ffmpegCache;
 let ffmpegCheckedAt = 0;
 
 app.setName('Crunchi');
+const isMac = process.platform === 'darwin';
 
 /* ------------------------------------------------------------------ */
 /* ffmpeg discovery                                                    */
@@ -115,8 +116,11 @@ function createWindow() {
     minWidth: 980,
     minHeight: 740,
     backgroundColor: '#0e0c0a',
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 20, y: 24 },
+    // The inset title bar and traffic-light offset are macOS-only. Other
+    // platforms keep their native window frame.
+    ...(isMac
+      ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 20, y: 24 } }
+      : {}),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -142,7 +146,6 @@ function createWindow() {
 }
 
 function buildMenu() {
-  const isMac = process.platform === 'darwin';
   const template = [];
 
   if (isMac) {

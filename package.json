@@ -3,6 +3,7 @@
   "productName": "Crunchi",
   "version": "1.0.1",
   "description": "A desktop app that compresses music into gloriously crunchy artifacts.",
+  "desktopName": "crunchi.desktop",
   "main": "main.js",
   "author": "Adam",
   "license": "MIT",
@@ -17,7 +18,8 @@
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "dist:linux": "electron-builder --linux"
   },
   "devDependencies": {
     "electron": "^44.9.1",
@@ -26,6 +28,7 @@
   "build": {
     "appId": "com.adam.crunchi",
     "productName": "Crunchi",
+    "compression": "maximum",
     "directories": {
       "output": "dist"
     },
@@ -44,6 +47,21 @@
       "target": [
         "dmg",
         "zip"
+      ]
+    },
+    "linux": {
+      "category": "AudioVideo",
+      "icon": "build/icon.png",
+      "executableName": "crunchi",
+      "syncDesktopName": true,
+      "maintainer": "Adam <342700778+adamstew4649@users.noreply.github.com>",
+      "synopsis": "Music, but crunchy.",
+      "description": "A desktop app that compresses music into gloriously crunchy artifacts.",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "target": [
+        "AppImage",
+        "deb",
+        "tar.gz"
       ]
     }
   }
